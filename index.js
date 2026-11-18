@@ -6,6 +6,7 @@ import serviceRoutes from "./routes/services.js";
 import bookingRoutes from "./routes/bookings.js";
 import adminRoutes from "./routes/admin.js";
 import userRoutes from "./routes/users.js";
+import paymentRoutes, { stripeWebhookHandler } from "./routes/payments.js";
 
 dotenv.config();
 
@@ -23,6 +24,13 @@ app.use(
   }),
 );
 
+// MUST be before express.json() for Stripe signature verification
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhookHandler,
+);
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -33,6 +41,7 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/payments", paymentRoutes);
 
 connectDB()
   .then(() => {
