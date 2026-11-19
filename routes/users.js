@@ -28,7 +28,9 @@ router.patch("/profile", verifyToken, async (req, res) => {
     if (typeof area === "string") updates.area = area.trim();
     if (typeof bio === "string") updates.bio = bio.trim();
     if (image?.trim()) updates.image = image.trim();
-
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
     await collections.users.updateOne(
       { email: req.user.email },
       { $set: updates },
