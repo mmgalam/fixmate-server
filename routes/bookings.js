@@ -86,6 +86,7 @@ router.post("/", verifyToken, verifyCustomer, async (req, res) => {
       finalAmount: service.basePrice,
       paymentStatus: "unpaid",
       createdAt: new Date(),
+      statusHistory: [{ status: "requested", changedAt: new Date() }],
     };
 
     const result = await collections.bookings.insertOne(booking);
@@ -133,7 +134,12 @@ router.patch("/:id/cancel", verifyToken, verifyCustomer, async (req, res) => {
 
     await collections.bookings.updateOne(
       { _id: booking._id },
-      { $set: { status: "cancelled" } },
+      {
+        $set: { status: "cancelled" },
+        $push: {
+          statusHistory: { status: "cancelled", changedAt: new Date() },
+        },
+      },
     );
 
     res.json({ message: "Booking cancelled successfully" });
@@ -238,11 +244,9 @@ router.patch("/:id/review", verifyToken, verifyCustomer, async (req, res) => {
     }
 
     if (booking.paymentStatus !== "paid") {
-      return res
-        .status(400)
-        .json({
-          message: "You can only review a booking after payment is completed",
-        });
+      return res.status(400).json({
+        message: "You can only review a booking after payment is completed",
+      });
     }
 
     if (booking.rating) {
