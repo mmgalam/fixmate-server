@@ -31,11 +31,9 @@ router.post("/", verifyToken, verifyCustomer, async (req, res) => {
     }
 
     if (!problemDescription || problemDescription.trim().length < 20) {
-      return res
-        .status(400)
-        .json({
-          message: "Problem description must be at least 20 characters",
-        });
+      return res.status(400).json({
+        message: "Problem description must be at least 20 characters",
+      });
     }
 
     const service = await collections.services.findOne({
@@ -65,11 +63,9 @@ router.post("/", verifyToken, verifyCustomer, async (req, res) => {
     });
 
     if (existingActive) {
-      return res
-        .status(409)
-        .json({
-          message: "You already have an active request for this service",
-        });
+      return res.status(409).json({
+        message: "You already have an active request for this service",
+      });
     }
 
     const booking = {
@@ -130,11 +126,9 @@ router.patch("/:id/cancel", verifyToken, verifyCustomer, async (req, res) => {
     }
 
     if (booking.status !== "requested") {
-      return res
-        .status(400)
-        .json({
-          message: 'Only bookings with status "requested" can be cancelled',
-        });
+      return res.status(400).json({
+        message: 'Only bookings with status "requested" can be cancelled',
+      });
     }
 
     await collections.bookings.updateOne(
@@ -200,12 +194,10 @@ router.patch("/:id/status", verifyToken, verifyTechnician, async (req, res) => {
     if (nextStatus === "completed") {
       const parsedAmount = Number(finalAmount);
       if (!parsedAmount || parsedAmount <= 0) {
-        return res
-          .status(400)
-          .json({
-            message:
-              "A valid final amount greater than 0 is required to complete a job",
-          });
+        return res.status(400).json({
+          message:
+            "A valid final amount greater than 0 is required to complete a job",
+        });
       }
       updateDoc.finalAmount = parsedAmount;
     }
@@ -217,6 +209,62 @@ router.patch("/:id/status", verifyToken, verifyTechnician, async (req, res) => {
     res.json({ message: `Job marked as ${nextStatus}`, ...updateDoc });
   } catch (err) {
     res.status(500).json({ message: "Failed to update job status" });
+  }
+});
+
+// 6. CUSTOMER: Rate & Review a Paid Booking (Optional Standout Feature)
+router.patch("/:id/review", verifyToken, verifyCustomer, async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid booking ID" });
+    }
+
+    const rating = Number(req.body.rating);
+    const review = req.body.review?.trim() || "";
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res
+        .status(400)
+        .json({ message: "Rating must be between 1 and 5 stars" });
+    }
+
+    const booking = await collections.bookings.findOne({
+      _id: new ObjectId(req.params.id),
+      customerEmail: req.user.email,
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (booking.paymentStatus !== "paid") {
+      return res
+        .status(400)
+        .json({
+          message: "You can only review a booking after payment is completed",
+        });
+    }
+
+    if (booking.rating) {
+      return res
+        .status(409)
+        .json({ message: "You have already reviewed this booking" });
+    }
+
+    await collections.bookings.updateOne(
+      { _id: booking._id },
+      {
+        $set: {
+          rating,
+          review,
+          reviewedAt: new Date(),
+        },
+      },
+    );
+
+    res.json({ message: "Thank you for your review!", rating, review });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to submit review" });
   }
 });
 
