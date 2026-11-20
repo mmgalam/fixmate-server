@@ -16,6 +16,10 @@ async function fulfillCheckoutSession(session) {
     stripeSessionId: session.id,
   });
   if (existingPayment) {
+    await collections.bookings.updateOne(
+      { _id: new ObjectId(existingPayment.bookingId) },
+      { $set: { paymentStatus: "paid" } },
+    );
     return existingPayment;
   }
 
@@ -91,11 +95,9 @@ router.post(
       }
 
       if (booking.status !== "completed") {
-        return res
-          .status(400)
-          .json({
-            message: "Payment is only allowed after the job is completed",
-          });
+        return res.status(400).json({
+          message: "Payment is only allowed after the job is completed",
+        });
       }
 
       if (booking.paymentStatus === "paid") {
@@ -114,7 +116,6 @@ router.post(
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
         mode: "payment",
         customer_email: req.user.email,
         line_items: [
